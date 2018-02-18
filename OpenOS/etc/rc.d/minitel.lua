@@ -124,7 +124,7 @@ function start()
   if pport == port then
    dprint(port,vport,packetType,dest)
    if checkPCache(packetID) then return end
-   if dest == hostname then
+   if dest == hostname or dest == "~" then
     if packetType == 1 then
      sendPacket(genPacketID(),2,sender,hostname,vport,packetID)
     end
@@ -137,12 +137,8 @@ function start()
      computer.pushSignal("net_msg",sender,vport,data)
     end
    else
-    -- Forward the packet as long as it's not a broadcast
-    if dest ~= "~" then
-     sendPacket(packetID,packetType,dest,sender,vport,data)
-    else
-     dprint("Got a broadcast from `"..from.."`, Not forwarding.")
-    end
+    -- Note that broadcasts won't reach here as they are already handled by the code that accepts packets intended for this computer.
+    sendPacket(packetID,packetType,dest,sender,vport,data)
    end
    if not rcache[sender] then
     dprint("rcache: "..sender..":", localModem,from,computer.uptime())
