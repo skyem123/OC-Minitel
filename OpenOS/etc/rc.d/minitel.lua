@@ -82,15 +82,59 @@ function start()
   return npID
  end
  
- local function sendPacket(packetID,packetType,dest,sender,vport,data)
-  if rcache[dest] then
-   dprint("Cached", rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
-   component.invoke(rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
-  else
-   dprint("Not cached", port,packetID,packetType,dest,sender,vport,data)
-   for k,v in pairs(modems) do
-    v.broadcast(port,packetID,packetType,dest,sender,vport,data)
+ local function splitMulticastAddressSet(dest)
+ local dests = {}
+ if dest ~= '~' then 
+  local oldsep = ''
+  for subaddr, sep in string.gmatch(dest, "([^~]*)(~?)") do
+   if #subaddr ~= 0 or #oldsep ~= 0 or #sep ~= 0 then
+    dests[subaddr] = true
    end
+   oldsep = sep
+  end
+ end
+ return dests
+ end
+ 
+ local function sendPacket(packetID,packetType,dest,sender,vport,data)
+  local dests = nil
+  if type(dest) == 'table' then
+   dests = dest
+   dest = nil
+  elseif dest ~= '~' then dests = splitMulticastAddressSet(dest)
+  else dests = {['~'] = true} end
+  
+  -- only send directly if... per modem... all destinations are the same L2...
+  local map = {}
+  local other = {}
+  for dest,_ in ipairs(dests) do
+   local cached = rcache[dest]
+   if cached then
+    local l2mod = cached[1]     
+    if map[l2mod] = nil then map[l2mod] = {} end
+    table.insert(map[l2mod], dest)
+   else
+    table.insert(other, dest)
+  end
+  
+  for _,modem in ipairs(modems) do
+   local to_send = map[modem]
+   for _,dest in ipairs(other) do
+    table.insert(map[modem], dest)
+   end
+   if #to_send > 0 then
+    if #to_send == 1 then
+     dest = to_send[1]
+     dprint("Cached", rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
+     component.invoke(rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
+    else
+     dest = table.concat(to_send, '~')
+     dprint("Not cached", port,packetID,packetType,dest,sender,vport,data)
+     for k,v in pairs(modems) do
+      v.broadcast(port,packetID,packetType,dest,sender,vport,data)
+     end
+    end
+  end
   end
  end
  
@@ -125,17 +169,7 @@ function start()
    dprint(port,vport,packetType,dest)
    if checkPCache(packetID) then return end
    
-   local dests = {}
-   if dest ~= '~' then 
-    local oldsep = ''
-    for subaddr, sep in string.gmatch(dest, "([^~]*)(~?)") do
-     if #subaddr ~= 0 or #oldsep ~= 0 or #sep ~= 0 then
-      dests[subaddr] = true
-     end
-     oldsep = sep
-     count = count + 1
-    end
-   end
+   local dests = splitMulticastAddressSet(dest)
    
    if dest == '' or dests[''] then
     dprint("Empty string is invalid address. Dropping packet.")
@@ -159,17 +193,8 @@ function start()
    -- Remove our address, and rebroadcast them.
    dests[hostname] = nil
    
-   dest = ""
-   for addr,_ in pairs(dests) do
-    if #dest == 0 then
-     dest = addr
-    else
-     dest = dest .. '~' .. addr
-    end
-   end
-   
    if #dest > 0 then
-     sendPacket(packetID,packetType,dest,sender,vport,data)
+     sendPacket(packetID,packetType,dests,sender,vport,data)
    end
    
    if not rcache[sender] then
