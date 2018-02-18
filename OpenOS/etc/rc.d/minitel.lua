@@ -111,10 +111,11 @@ function start()
    local cached = rcache[dest]
    if cached then
     local l2mod = cached[1]     
-    if map[l2mod] = nil then map[l2mod] = {} end
+    if map[l2mod] == nil then map[l2mod] = {} end
     table.insert(map[l2mod], dest)
    else
     table.insert(other, dest)
+   end
   end
   
   for _,modem in ipairs(modems) do
@@ -134,7 +135,7 @@ function start()
       v.broadcast(port,packetID,packetType,dest,sender,vport,data)
      end
     end
-  end
+   end
   end
  end
  
