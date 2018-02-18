@@ -52,9 +52,12 @@ local pqueue = {}
 local pcache = {}
 local pctime = 30
 
+local dcount = 10
 local function dprint(...)
  if dbug then
   print(...)
+  dcount = dcount - 1
+  if dcount < 0 then dbug = false end
  end
 end
 
@@ -104,10 +107,12 @@ function start()
   elseif dest ~= '~' then dests = splitMulticastAddressSet(dest)
   else dests = {['~'] = true} end
   
+  dprint(dest)
+  
   -- only send directly if... per modem... all destinations are the same L2...
   local map = {}
   local other = {}
-  for dest,_ in ipairs(dests) do
+  for dest,_ in pairs(dests) do
    local cached = rcache[dest]
    if cached then
     local l2mod = cached[1]     
@@ -119,12 +124,19 @@ function start()
   end
   
   for _,modem in ipairs(modems) do
+   dprint(modem.address)
+   if map[modem] == nil then map[modem] = {} end
    local to_send = map[modem]
    for _,dest in ipairs(other) do
-    table.insert(map[modem], dest)
+    dprint(dest)
+    table.insert(to_send, dest)
    end
+   
+   dprint(#to_send)
+   
    if #to_send > 0 then
-    if #to_send == 1 then
+    dprint("sending...")
+    if #to_send == 1 and #other < 0 then
      dest = to_send[1]
      dprint("Cached", rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
      component.invoke(rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
@@ -256,6 +268,7 @@ function stop()
 end
 
 function debug()
+ dcount = 10
  dbug = not dbug
 end
 function set_retry(sn)
