@@ -137,7 +137,12 @@ function start()
      computer.pushSignal("net_msg",sender,vport,data)
     end
    else
-    sendPacket(packetID,packetType,dest,sender,vport,data)
+    -- Forward the packet as long as it's not a broadcast
+    if dest ~= "~" then
+     sendPacket(packetID,packetType,dest,sender,vport,data)
+    else
+     dprint("Got a broadcast from `"..from.."`, Not forwarding.")
+    end
    end
    if not rcache[sender] then
     dprint("rcache: "..sender..":", localModem,from,computer.uptime())
