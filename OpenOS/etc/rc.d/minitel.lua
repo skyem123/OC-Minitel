@@ -124,7 +124,24 @@ function start()
   if pport == port then
    dprint(port,vport,packetType,dest)
    if checkPCache(packetID) then return end
-   if dest == hostname or dest == "~" then
+   
+   local dests = {}
+   if dest ~= '~' then 
+    local oldsep = ''
+    for subaddr, sep in string.gmatch(dest, "([^~]*)(~?)") do
+     if #subaddr ~= 0 or #oldsep ~= 0 or #sep ~= 0 then
+      dests[subaddr] = true
+     end
+     oldsep = sep
+     count = count + 1
+    end
+   end
+   
+   if dest == '' or dests[''] then
+    dprint("Empty string is invalid address. Dropping packet.")
+   end
+   
+   if dests[hostname] or dest == '~' then
     if packetType == 1 then
      sendPacket(genPacketID(),2,sender,hostname,vport,packetID)
     end
@@ -136,15 +153,25 @@ function start()
     if packetType ~= 2 then
      computer.pushSignal("net_msg",sender,vport,data)
     end
-   else
-    -- Note that broadcasts won't reach here as they are already handled by the code that accepts packets intended for this computer.
-    -- Multicast destinations have ~, and also broadcast, though that's already handled.
-    if not string.find(dest, "~") then
-     sendPacket(packetID,packetType,dest,sender,vport,data)
+   end
+   
+   -- Now resend packets...
+   -- Remove our address, and rebroadcast them.
+   dests[hostname] = nil
+   
+   dest = ""
+   for addr,_ in pairs(dests) do
+    if #dest == 0 then
+     dest = addr
     else
-     dprint("Multicast from `"..from.."`, multicast unsupported, dropping packet.")
+     dest = dest .. '~' .. addr
     end
    end
+   
+   if #dest > 0 then
+     sendPacket(packetID,packetType,dest,sender,vport,data)
+   end
+   
    if not rcache[sender] then
     dprint("rcache: "..sender..":", localModem,from,computer.uptime())
     rcache[sender] = {localModem,from,computer.uptime()+rctime}
