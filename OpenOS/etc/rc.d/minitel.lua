@@ -138,7 +138,12 @@ function start()
     end
    else
     -- Note that broadcasts won't reach here as they are already handled by the code that accepts packets intended for this computer.
-    sendPacket(packetID,packetType,dest,sender,vport,data)
+    -- Multicast destinations have ~, and also broadcast, though that's already handled.
+    if not string.find(dest, "~") then
+     sendPacket(packetID,packetType,dest,sender,vport,data)
+    else
+     dprint("Multicast from `"..from.."`, multicast unsupported, dropping packet.")
+    end
    end
    if not rcache[sender] then
     dprint("rcache: "..sender..":", localModem,from,computer.uptime())
