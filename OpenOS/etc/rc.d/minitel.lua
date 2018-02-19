@@ -97,9 +97,11 @@ function start()
   local dests = nil
   if type(dest) == 'table' then
    dests = dest
-   dest = nil
-  elseif dest ~= '~' then dests = splitMulticastAddressSet(dest)
-  else dests = {['~'] = true} end
+  else
+   dests = splitMulticastAddressSet(dest)
+  end
+  -- We will be overwriting this anyway, but good idea to remove it before we get any crazy ideas
+  dest = nil
   
   -- only send directly if... per modem... all destinations are the same L2...
   local map = {}
@@ -119,7 +121,7 @@ function start()
    for _,dest in ipairs(other) do
     table.insert(map[modem], dest)
    end
-   if #to_send > 0 then
+   if to_send ~= nil or #to_send > 0 then
     if #to_send == 1 then
      dest = to_send[1]
      dprint("Cached", rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
@@ -169,10 +171,10 @@ function start()
    local dests = splitMulticastAddressSet(dest)
    
    if dest == '' or dests[''] then
-    dprint("Empty string is invalid address. Dropping packet.")
+    dprint("Empty string is invalid address!")
    end
    
-   if dests[hostname] or dest == '~' then
+   if dests[hostname] or dests['~'] then
     if packetType == 1 then
      sendPacket(genPacketID(),2,sender,hostname,vport,packetID)
     end
@@ -187,10 +189,11 @@ function start()
    end
    
    -- Now resend packets...
-   -- Remove our address, and rebroadcast them.
+   -- Remove our address and broadcast, and retransmit.
+   dests['~'] = nil
    dests[hostname] = nil
    
-   if #dest > 0 then
+   if next(dests) ~= nil then
      sendPacket(packetID,packetType,dests,sender,vport,data)
    end
    
