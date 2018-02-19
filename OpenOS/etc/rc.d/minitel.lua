@@ -10,6 +10,7 @@ sender: original sender of packet
 data: the actual packet data, duh.
 ]]--
 
+local real_debug = debug
 local listeners = {}
 local timers = {}
 
@@ -83,6 +84,9 @@ function start()
  end
  
  local function splitMulticastAddressSet(dest)
+  if dest == nil then
+   dprint(real_debug.traceback())
+  end
   local dests = {}
   for subaddr, sep in string.gmatch(dest, "([^~]+)(~?)") do
    dests[subaddr] = true
@@ -94,6 +98,7 @@ function start()
  end
  
  local function sendPacket(packetID,packetType,dest,sender,vport,data)
+  --dprint("sendPacket")
   local dests = nil
   if type(dest) == 'table' then
    dests = dest
@@ -112,6 +117,7 @@ function start()
     local l2mod = cached[1]     
     if map[l2mod] == nil then map[l2mod] = {} end
     table.insert(map[l2mod], dest)
+    --dprint("map['"..l2mod.."']='"..dest.."'" )
    else
     table.insert(other, dest)
    end
@@ -119,22 +125,23 @@ function start()
   
   for _,modem in ipairs(modems) do
    --dprint(modem.address)
-   local to_send = map[modem]
+   local to_send = map[modem.address]
    if to_send == nil then to_send = {} end
    for _,dest in ipairs(other) do
-    dprint(dest)
+    --dprint(dest)
     table.insert(to_send, dest)
    end
    if #to_send > 0 then
-    if #to_send == 1 and to_send[1] ~= '~' and rcache[to_send[1]] ~= nil then
-     dprint("Cached", rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
-     component.invoke(rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
+    --dprint("#to_send = " .. #to_send)
+    dest = table.concat(to_send, '~')
+    if #to_send == 1 and not dests['~'] and rcache[to_send[1]] ~= nil then
+     l2addr = rcache[to_send[1]][2]
+     dprint("Direct", modem.address,"send",l2addr,port,packetID,packetType,dest,sender,vport,data)
+     component.invoke(modem.address,"send",l2addr,port,packetID,packetType,dest,sender,vport,data)
+     --component.invoke(modem.address, "broadcast", port,packetID,packetType,dest,sender,vport,data)
     else
-     dest = table.concat(to_send, '~')
-     dprint("Not cached", port,packetID,packetType,dest,sender,vport,data)
-     for k,v in pairs(modems) do
-      v.broadcast(port,packetID,packetType,dest,sender,vport,data)
-     end
+     dprint("Broadcast", "broadcast", port,packetID,packetType,dest,sender,vport,data)
+     component.invoke(modem.address, "broadcast", port,packetID,packetType,dest,sender,vport,data)
     end
    end
   end
@@ -142,7 +149,7 @@ function start()
  
  local function pruneCache()
   for k,v in pairs(rcache) do
-   dprint(k,v[3],computer.uptime())
+   --dprint(k,v[3],computer.uptime())
    if v[3] < computer.uptime() then
     rcache[k] = nil
     dprint("pruned "..k.." from routing cache")
@@ -157,9 +164,9 @@ function start()
  end
 
  local function checkPCache(packetID)
-  dprint(packetID)
+  --dprint(packetID)
   for k,v in pairs(pcache) do
-   dprint(k)
+   --dprint(k)
    if k == packetID then return true end
   end
   return false
@@ -168,7 +175,7 @@ function start()
  local function processPacket(_,localModem,from,pport,_,packetID,packetType,dest,sender,vport,data)
   pruneCache()
   if pport == port then
-   dprint(port,vport,packetType,dest)
+   --dprint(port,vport,packetType,dest)
    if checkPCache(packetID) then return end
    
    local dests = splitMulticastAddressSet(dest)
@@ -217,7 +224,7 @@ function start()
  local function queuePacket(_,ptype,to,vport,data,npID)
   npID = npID or genPacketID()
   pqueue[npID] = {ptype,to,vport,data,0,0}
-  dprint(npID,table.unpack(pqueue[npID]))
+  --dprint(npID,table.unpack(pqueue[npID]))
  end
  
  listeners["net_send"]=queuePacket
@@ -227,7 +234,7 @@ function start()
  local function packetPusher()
   for k,v in pairs(pqueue) do
    if v[5] < computer.uptime() then
-    dprint(k,v[1],v[2],hostname,v[3],v[4])
+    --dprint(k,v[1],v[2],hostname,v[3],v[4])
     sendPacket(k,v[1],v[2],hostname,v[3],v[4])
     if v[1] ~= 1 or v[6] == 255 then
      pqueue[k] = nil
