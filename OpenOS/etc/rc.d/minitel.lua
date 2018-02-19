@@ -106,7 +106,7 @@ function start()
   -- only send directly if... per modem... all destinations are the same L2...
   local map = {}
   local other = {}
-  for dest,_ in ipairs(dests) do
+  for dest,_ in pairs(dests) do
    local cached = rcache[dest]
    if cached then
     local l2mod = cached[1]     
@@ -118,13 +118,15 @@ function start()
   end
   
   for _,modem in ipairs(modems) do
+   --dprint(modem.address)
    local to_send = map[modem]
+   if to_send == nil then to_send = {} end
    for _,dest in ipairs(other) do
-    table.insert(map[modem], dest)
+    dprint(dest)
+    table.insert(to_send, dest)
    end
-   if to_send ~= nil or #to_send > 0 then
-    if #to_send == 1 then
-     dest = to_send[1]
+   if #to_send > 0 then
+    if #to_send == 1 and to_send[1] ~= '~' and rcache[to_send[1]] ~= nil then
      dprint("Cached", rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
      component.invoke(rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
     else
