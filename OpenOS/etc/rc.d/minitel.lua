@@ -52,12 +52,9 @@ local pqueue = {}
 local pcache = {}
 local pctime = 30
 
-local dcount = 10
 local function dprint(...)
  if dbug then
   print(...)
-  dcount = dcount - 1
-  if dcount < 0 then dbug = false end
  end
 end
 
@@ -86,17 +83,14 @@ function start()
  end
  
  local function splitMulticastAddressSet(dest)
- local dests = {}
- if dest ~= '~' then 
-  local oldsep = ''
-  for subaddr, sep in string.gmatch(dest, "([^~]*)(~?)") do
-   if #subaddr ~= 0 or #oldsep ~= 0 or #sep ~= 0 then
-    dests[subaddr] = true
-   end
-   oldsep = sep
+  local dests = {}
+  for subaddr, sep in string.gmatch(dest, "([^~]+)(~?)") do
+   dests[subaddr] = true
   end
- end
- return dests
+  if dest == '~' or string.sub(dest, 1,2) == '~~' or string.sub(dest, #dest-1,#dest) == '~~' or string.find(dest, '~~~') then
+    dests['~'] = true
+  end
+  return dests
  end
  
  local function sendPacket(packetID,packetType,dest,sender,vport,data)
@@ -107,36 +101,26 @@ function start()
   elseif dest ~= '~' then dests = splitMulticastAddressSet(dest)
   else dests = {['~'] = true} end
   
-  dprint(dest)
-  
   -- only send directly if... per modem... all destinations are the same L2...
   local map = {}
   local other = {}
-  for dest,_ in pairs(dests) do
+  for dest,_ in ipairs(dests) do
    local cached = rcache[dest]
    if cached then
     local l2mod = cached[1]     
-    if map[l2mod] == nil then map[l2mod] = {} end
+    if map[l2mod] = nil then map[l2mod] = {} end
     table.insert(map[l2mod], dest)
    else
     table.insert(other, dest)
-   end
   end
   
   for _,modem in ipairs(modems) do
-   dprint(modem.address)
-   if map[modem] == nil then map[modem] = {} end
    local to_send = map[modem]
    for _,dest in ipairs(other) do
-    dprint(dest)
-    table.insert(to_send, dest)
+    table.insert(map[modem], dest)
    end
-   
-   dprint(#to_send)
-   
    if #to_send > 0 then
-    dprint("sending...")
-    if #to_send == 1 and #other < 0 then
+    if #to_send == 1 then
      dest = to_send[1]
      dprint("Cached", rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
      component.invoke(rcache[dest][1],"send",rcache[dest][2],port,packetID,packetType,dest,sender,vport,data)
@@ -147,7 +131,7 @@ function start()
       v.broadcast(port,packetID,packetType,dest,sender,vport,data)
      end
     end
-   end
+  end
   end
  end
  
@@ -268,7 +252,6 @@ function stop()
 end
 
 function debug()
- dcount = 10
  dbug = not dbug
 end
 function set_retry(sn)
